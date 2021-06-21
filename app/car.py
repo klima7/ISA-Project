@@ -122,8 +122,8 @@ class Car:
 
     @property
     def front_point(self):
-        return util.move_forward(self.gps, self.orient, 0)
+        return util.move_forward(self.gps, self.orient, 0.2)
 
     @property
     def back_point(self):
-        return util.move_forward(self.gps, self.orient, 0)
+        return util.move_forward(self.gps, self.orient, 0.2)
