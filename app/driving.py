@@ -15,7 +15,6 @@ class Task:
 
 
 class Driver:
-
     # Speed in simulation units per second
     NORMAL_SPEED = 1
     BACKWARD_SPEED = 1
@@ -32,6 +31,9 @@ class Driver:
 
         self.route = None
         self.position = None
+
+        self.orientations = []
+        self.found_orientations = 0
 
         self.cur_path = Path.get_path_closest_to_point(self.mm.paths, self.car.gps)
 
@@ -61,7 +63,8 @@ class Driver:
             if self.tasks:
                 self.cur_task = self.tasks.pop(0)
                 self.position = Position(reversed=self.cur_task.backward)
-                self.route = RouteFinder.find_route(self.cur_path, self.cur_task.target, backward=self.cur_task.backward)
+                self.route = RouteFinder.find_route(self.cur_path, self.cur_task.target,
+                                                    backward=self.cur_task.backward)
 
     def update_speed(self):
         if self.cur_task is None:
@@ -78,11 +81,32 @@ class Driver:
         leading_point = self.car.front_point if not self.cur_task.backward else self.car.back_point
         self.position.offset = self.cur_path.get_closest_offset(leading_point)
 
-        path, radius = self.planner.plan_route(self.route, self.position, leading_point, self.car.orient, backward=self.cur_task.backward)
+
+        if len(self.orientations) < 15:
+            self.orientations.append(self.car.orient)
+        else:
+            self.orientations[self.found_orientations] = self.car.orient
+            self.found_orientations += 1
+            if self.found_orientations == 15:
+                self.found_orientations = 0
+
+        orient = sum(self.orientations) / len(self.orientations)
+
+        path, radius = self.planner.plan_route(self.route, self.position, leading_point, self.car.orient,
+                                               backward=self.cur_task.backward)
+
+        print("orient: ", orient, " radius: ", radius)
+        if self.car.orient > orient and abs(self.car.orient - orient) > 0.0001:
+            radius += 0.15
+        elif self.car.orient < orient and abs(self.car.orient - orient) > 0.0001:
+            radius -= 0.15
+
         self.car.set_wheels_by_radius(radius if not self.cur_task.backward else -radius)
+
         self.car.set_planned_path_visualization(path)
 
-        if self.cur_path == self.route[len(self.route) - 1] and self.position.get_offset_from_start() >= self.cur_task.offset:   # TODO
+        if self.cur_path == self.route[
+            len(self.route) - 1] and self.position.get_offset_from_start() >= self.cur_task.offset:  # TODO
             self.cur_task = None
 
         elif self.position.offset == self.position.get_end_offset():
@@ -106,17 +130,28 @@ class Driver:
             self.car.indicators_lights = Car.INDICATORS_DISABLED
             return
 
-        next_crossing_pos = self.route.get_next_position(self.position, lambda path: isinstance(path.structure, Crossing) or path.is_roundabout_exit())
+        next_crossing_pos = self.route.get_next_position(self.position, lambda path: isinstance(path.structure,
+                                                                                                Crossing) or path.is_roundabout_exit())
         next_crossing_distance = self.route.get_distance_between(self.position, next_crossing_pos)
 
-        prev_crossing_pos = self.route.get_prev_position(self.position, lambda path: isinstance(path.structure, Crossing) or path.is_roundabout_exit())
+        prev_crossing_pos = self.route.get_prev_position(self.position, lambda path: isinstance(path.structure,
+                                                                                                Crossing) or path.is_roundabout_exit())
         prev_crossing_distance = self.route.get_distance_between(prev_crossing_pos, self.position)
 
         if next_crossing_pos is not None and next_crossing_distance < 3.5:
+            if 3.4 < next_crossing_distance < 3.5:
+                self.angles = []
+                self.found_angles = 0
+
             angle = self.route.get_angle(next_crossing_pos)
             if angle > 0.2:
                 self.car.indicators_lights = Car.INDICATORS_LEFT
             elif angle < -0.2:
                 self.car.indicators_lights = Car.INDICATORS_RIGHT
+
+            self.car.velocity = 0.3
         if prev_crossing_pos is not None and 3 > prev_crossing_distance > 2:
             self.car.indicators_lights = Car.INDICATORS_DISABLED
+            if 3 > prev_crossing_distance > 2.9:
+                self.angles = []
+                self.found_angles = 0
