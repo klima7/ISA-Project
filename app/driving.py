@@ -17,7 +17,7 @@ class Task:
 class Driver:
 
     # Speed in simulation units per second
-    NORMAL_SPEED = 1
+    NORMAL_SPEED = 0
     BACKWARD_SPEED = 1
     WALKWAY_SPEED = 0.4
     LIMITED_SPEED = 0.5
@@ -97,7 +97,7 @@ class Driver:
             self.car.velocity = 0
 
     def update_signs(self):
-        if self.counter % 5 == 0:
+        if self.counter % 2 == 0:
             signs, view = find_signs(self.car.view)
             if view is not None:
                 self.car.set_view_visualization(view)

@@ -13,10 +13,15 @@ CAMERA_IMAGE_WIDTH = 512
 SIGN_REAL_HEIGHT = 0.48978
 
 
-print('Loading Neural Network')
-model = load_model("../nn.h5")
-model.compile()
-model.predict(np.zeros((1, 16, 16, 1), dtype=np.float))
+print('Loading signs Neural Network')
+nn_signs = load_model("../nn_signs.h5")
+nn_signs.compile()
+nn_signs.predict(np.zeros((1, 16, 16, 1), dtype=np.float))
+
+print('Loading lights Neural Network')
+nn_lights = load_model("../nn_lights.h5")
+nn_lights.compile()
+nn_lights.predict(np.zeros((1, 16, 16, 1), dtype=np.float))
 
 
 class FoundSign:
@@ -26,7 +31,8 @@ class FoundSign:
         self.head_pos = self._locate_sign_head()
         self.head_image = self._cut_head_image(image)
         self.type = SignType.UNKNOWN
-        self.recognize()
+        self.color = TrafficLightColor.NONE
+        self.recognize_sign()
 
     def _locate_sign_head(self):
         x, y, h = self.stick
@@ -39,7 +45,7 @@ class FoundSign:
             return None
         return image[y:y + a, x:x + a]
 
-    def recognize(self):
+    def recognize_sign(self):
         if self.head_image is None:
             return SignType.UNKNOWN
 
@@ -48,9 +54,22 @@ class FoundSign:
         scaled = np.reshape(scaled, (16, 16, 1))
         scaled = scaled.astype(np.float32) / 255
 
-        res = model.predict(np.array([scaled]))
+        res = nn_signs.predict(np.array([scaled]))
         res = np.argmax(res[0])
         self.type = SignType(res)
+
+    def recognize_light(self):
+        if self.head_image is None:
+            return SignType.UNKNOWN
+
+        gray = cv2.cvtColor(cv2.cvtColor(self.head_image, cv2.COLOR_HSV2BGR), cv2.COLOR_BGR2GRAY)
+        scaled = cv2.resize(gray, (16, 16))
+        scaled = np.reshape(scaled, (16, 16, 1))
+        scaled = scaled.astype(np.float32) / 255
+
+        res = nn_lights.predict(np.array([scaled]))
+        res = np.argmax(res[0])
+        self.color = TrafficLightColor(res)
 
     def _is_reversed(self):
         mask = cv2.inRange(self.head_image, np.array([20, 0, 190]), np.array([40, 50, 250]))
@@ -88,7 +107,12 @@ class FoundSign:
         cv2.line(hsv_image, stick_start, stick_end, (0, 0, 0), 2)
 
         font = cv2.FONT_HERSHEY_PLAIN
-        cv2.putText(hsv_image, self.type.name, (head_start[0], head_start[1]), font, 1, (0, 0, 0), 1, cv2.LINE_AA)
+
+        if self.type != SignType.TRAFFIC_LIGHTS:
+            cv2.putText(hsv_image, self.type.name, (head_start[0], head_start[1]), font, 1, (0, 0, 0), 1, cv2.LINE_AA)
+        else:
+            self.recognize_light()
+            cv2.putText(hsv_image, self.color.name, (head_start[0], head_start[1]), font, 1, (0, 0, 0), 1, cv2.LINE_AA)
 
 
 def find_signs(image):
