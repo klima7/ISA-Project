@@ -67,6 +67,8 @@ class Car:
         self.running_lights = bool(lights_data[2])
         self.reverse_lights = bool(lights_data[3])
 
+        _, self.lidar_main_data = self._client.simxUnpackFloats(data[4], self._client.simxServiceCall())
+
     def set_planned_path_visualization(self, path):
         data = [[s.x, s.y] for s in path.samples]
         self._client.simxCallScriptFunction("set_path@PlannedRouteVisualization", "sim.scripttype_childscript", data, self._client.simxDefaultPublisher())
@@ -127,3 +129,7 @@ class Car:
     @property
     def back_point(self):
         return util.move_forward(self.gps, self.orient, 0)
+
+    def get_lidar_data(self):
+        return self.lidar_main_data
+

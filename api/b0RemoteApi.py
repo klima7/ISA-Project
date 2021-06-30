@@ -542,3 +542,7 @@ class RemoteApiClient:
     # Then add the server part of your custom functions at the
     # beginning of file lua/b0RemoteApiServer.lua
     # -----------------------------------------------------------
+
+    def simxUnpackFloats(self, data, topic):
+        reqArgs = [data]
+        return self._handleFunction('simUnpackFloats', reqArgs, topic)
